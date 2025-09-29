@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Morse Code Generator</title>
+  <style>
+    :root{--bg:#0b1220;--card:#0f1a2b;--accent:#00d1ff;--muted:#9fb3c8}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;margin:0;min-height:100vh;background:linear-gradient(180deg,#061021 0%,#0b1220 100%);color:#e6f6ff;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:12px;padding:20px;max-width:920px;width:100%;box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+    h1{margin:0 0 6px;font-size:20px}
+    p.small{margin:0 0 16px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    textarea{width:100%;height:120px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;resize:vertical}
+    .controls{display:flex;gap:8px;align-items:center}
+    button{background:var(--accent);border:none;padding:8px 12px;border-radius:8px;color:#02121a;font-weight:600;cursor:pointer}
+    .muted{color:var(--muted);font-size:13px}
+    .row{display:flex;gap:8px}
+    .small-btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:6px 8px;border-radius:8px;color:inherit;cursor:pointer}
+    .output{background:rgba(255,255,255,0.02);padding:12px;border-radius:8px;min-height:120px;white-space:pre-wrap}
+    label{font-size:13px;color:var(--muted)}
+    footer{margin-top:12px;color:var(--muted);font-size:13px}
+    @media(max-width:800px){.grid{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Morse Code Generator</h1>
+    <p class="small">Type text below to encode to Morse, or paste Morse to decode. Play audio, copy results, and adjust speed.</p>
+
+    <div class="grid">
+      <div>
+        <label for="input">Input (text or morse)</label>
+        <textarea id="input" placeholder="Type: Hello World"></textarea>
+        <div class="row" style="margin-top:8px;">
+          <button id="encode">Encode →</button>
+          <button id="decode">Decode ←</button>
+          <button id="swap" class="small-btn">Swap</button>
+          <button id="clear" class="small-btn">Clear</button>
+        </div>
+
+        <div style="margin-top:12px;">
+          <label for="wpm">Playback speed (wpm): <span id="wpmVal">20</span></label>
+          <input id="wpm" type="range" min="5" max="40" value="20" style="width:100%">
+        </div>
+
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <button id="play">Play</button>
+          <button id="stop" class="small-btn">Stop</button>
+          <button id="copyOut" class="small-btn">Copy Output</button>
+        </div>
+      </div>
+
+      <div>
+        <label for="output">Output</label>
+        <div id="output" class="output"></div>
+        <div style="margin-top:8px;" class="muted">Use <code>/</code> to separate words when manually typing Morse (default behavior). Supported: A–Z, 0–9, common punctuation.</div>
+
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button id="sample" class="small-btn">Insert sample text</button>
+          <button id="table" class="small-btn">Show mapping</button>
+        </div>
+      </div>
+    </div>
+
+    <footer>Made for quick encoding/decoding. You can save this file and open it locally in your browser.</footer>
+  </div>
+
+  <script>
+    const MORSE = {
+      'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.','H':'....','I':'..','J':'.---','K':'-.-','L':'.-..','M':'--','N':'-.','O':'---','P':'.--.','Q':'--.-','R':'.-.','S':'...','T':'-','U':'..-','V':'...-','W':'.--','X':'-..-','Y':'-.--','Z':'--..',
+      '0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.',
+      '.':'.-.-.-',',':'--..--','?':'..--..','!':'-.-.--','-':'-....-','/':'-..-.','@':'.--.-.','(':'-.--.',')':'-.--.-',':':'---...','=':'-...-','"':'.-..-.',"'":'.----.'
+    };
+    const REVERSE = {};
+    for (const k in MORSE) REVERSE[MORSE[k]] = k;
+
+    const $ = sel => document.querySelector(sel);
+    const input = $('#input');
+    const output = $('#output');
+    const encodeBtn = $('#encode');
+    const decodeBtn = $('#decode');
+    const playBtn = $('#play');
+    const stopBtn = $('#stop');
+    const copyOut = $('#copyOut');
+    const swapBtn = $('#swap');
+    const clearBtn = $('#clear');
+    const sampleBtn = $('#sample');
+    const tableBtn = $('#table');
+    const wpm = $('#wpm');
+    const wpmVal = $('#wpmVal');
+
+    function encode(text){
+      // Normalize
+      text = text.toUpperCase();
+      const words = text.split(/\s+/);
+      const parts = words.map(w => {
+        return w.split('').map(ch => MORSE[ch] || '').filter(Boolean).join(' ');
+      }).filter(Boolean);
+      return parts.join(' / ');
+    }
+
+    function decode(morse){
+      // Accept dots, dashes, spaces. Words separated by / or 3+ spaces.
+      morse = morse.trim();
+      if (!morse) return '';
+      // Normalize separators
+      const wordParts = morse.split(/\s*\/\s*|\s{3,}/);
+      const decodedWords = wordParts.map(w => {
+        return w.trim().split(/\s+/).map(s => REVERSE[s] || '?').join('');
+      });
+      return decodedWords.join(' ');
+    }
+
+    encodeBtn.onclick = ()=>{ output.textContent = encode(input.value); }
+    decodeBtn.onclick = ()=>{ output.textContent = decode(input.value); }
+    swapBtn.onclick = ()=>{ const a = input.value; input.value = output.textContent; output.textContent = a; }
+    clearBtn.onclick = ()=>{ input.value=''; output.textContent=''; }
+    sampleBtn.onclick = ()=>{ input.value = 'Hello World'; output.textContent=''; }
+
+    copyOut.onclick = async ()=>{
+      try{ await navigator.clipboard.writeText(output.textContent); alert('Copied output to clipboard'); }catch(e){ alert('Copy failed: '+e); }
+    }
+
+    tableBtn.onclick = ()=>{
+      const rows = Object.keys(MORSE).sort().map(k => `${k} : ${MORSE[k]}`).join('\n');
+      output.textContent = rows;
+    }
+
+    wpm.oninput = ()=>{ wpmVal.textContent = wpm.value; }
+
+    // Audio playback
+    let audioCtx = null; let stopFlag=false;
+    function dotDurationFromWpm(wpmValue){
+      // Approximation: dot = 1.2s / wpm (PARIS standard uses 50ms at 20 wpm -> this is a simple linear mapping)
+      return 1.2 / Number(wpmValue);
+    }
+
+    function playMorse(morse){
+      if (!morse) return;
+      stopFlag = false;
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const durDot = dotDurationFromWpm(wpm.value);
+      const tDot = durDot; const tDash = durDot*3; const intra = durDot; const betweenLetters = durDot*3; const betweenWords = durDot*7;
+
+      let time = audioCtx.currentTime + 0.05;
+      const gain = audioCtx.createGain(); gain.connect(audioCtx.destination);
+      gain.gain.value = 0.0001; // start silent
+
+      const playTone = (start, dur) => {
+        const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.value = 700;
+        const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination);
+        g.gain.setValueAtTime(0.0001, start);
+        g.gain.linearRampToValueAtTime(0.5, start + 0.01);
+        g.gain.linearRampToValueAtTime(0.0001, start + dur - 0.01);
+        o.start(start); o.stop(start + dur + 0.02);
+      }
+
+      const tokens = morse.split(/(\s+|\/)/).filter(x=>x!=='' && x!=null);
+      for (let i=0;i<tokens.length;i++){
+        if (stopFlag) break;
+        const tok = tokens[i];
+        if (tok.trim()==='/') { time += betweenWords; continue; }
+        if (/^\s+$/.test(tok)) { time += betweenWords; continue; }
+        // token is series of . and - or letters separated by spaces
+        const chars = tok.split(' ');
+        for (let j=0;j<chars.length;j++){
+          const symbol = chars[j];
+          for (let k=0;k<symbol.length;k++){
+            const c = symbol[k];
+            if (c=== '.') { playTone(time, tDot); time += tDot; }
+            else if (c==='-') { playTone(time, tDash); time += tDash; }
+            time += intra;
+          }
+          time += betweenLetters - intra; // after a letter
+        }
+        time += betweenWords - betweenLetters; // after a word
+      }
+    }
+
+    playBtn.onclick = ()=>{
+      const text = output.textContent.trim();
+      if (!text){ alert('Nothing to play. First encode or paste Morse into the output.'); return; }
+      // If output contains letters (A-Z), convert to morse first
+      const isPlainText = /[A-Za-z0-9]/.test(text);
+      const morseText = isPlainText ? encode(text) : text;
+      try{ playMorse(morseText); }catch(e){ alert('Playback failed: '+e); }
+    }
+
+    stopBtn.onclick = ()=>{ stopFlag = true; if (audioCtx && audioCtx.state!=='closed') { try{ /* cannot reliably stop scheduled oscillators; recreate audioCtx */ audioCtx.close(); audioCtx = null; }catch(e){} } }
+
+    // keyboard shortcuts
+    document.addEventListener('keydown', e=>{
+      if ((e.ctrlKey||e.metaKey) && e.key==='Enter') { encodeBtn.click(); }
+    });
+
+    // small usability: paste morse with long dash variants
+    input.addEventListener('input', ()=>{
+      input.value = input.value.replace(/—/g,'-').replace(/–/g,'-');
+    });
+
+  </script>
+</body>
+</html>
