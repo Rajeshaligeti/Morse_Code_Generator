@@ -2,6 +2,8 @@
 
 A simple, offline-capable **Morse Code Generator** built using **HTML, CSS, and JavaScript**. It allows you to encode text to Morse code, decode Morse back to text, play Morse audio with adjustable speed, and copy/share results.
 
+## Website: https://rajeshaligeti.github.io/Morse_Code_Generator/
+
 ## ✨ Features
 - **Encode** plain text (A–Z, 0–9, common punctuation) into Morse code.
 - **Decode** Morse code back into readable text.
